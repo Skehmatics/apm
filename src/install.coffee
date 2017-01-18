@@ -78,6 +78,12 @@ class Install extends Command
     useStrictSsl = @npm.config.get('strict-ssl') ? true
     env.NODE_TLS_REJECT_UNAUTHORIZED = 0 unless useStrictSsl
 
+    # Pass the tls-cipher-list property to node-gyp
+    # depends on node-js/node-gyp #1091
+    # https://github.com/nodejs/node-gyp/pull/1091
+    cipherList = @npm.config.get('tls-cipher-list')
+    installNodeArgs.push("--ciphers=#{cipherList}") if cipherList
+
     # Pass through configured proxy to node-gyp
     proxy = @npm.config.get('https-proxy') or @npm.config.get('proxy') or env.HTTPS_PROXY or env.HTTP_PROXY
     installNodeArgs.push("--proxy=#{proxy}") if proxy
@@ -221,6 +227,13 @@ class Install extends Command
       url: "#{config.getAtomPackagesUrl()}/#{packageName}"
       json: true
       retries: 4
+
+    # set request ciphers if exists
+    cipherList = @npm.config.get('tls-cipher-list')
+    if cipherList?
+      requestSettings.agentOptions =
+        ciphers: cipherList
+
     request.get requestSettings, (error, response, body={}) ->
       if error?
         message = "Request for package information failed: #{error.message}"
@@ -244,6 +257,13 @@ class Install extends Command
   #            as the second.
   downloadPackage: (packageUrl, installGlobally, callback) ->
     requestSettings = url: packageUrl
+
+    # set request ciphers if exists
+    cipherList = @npm.config.get('tls-cipher-list')
+    if cipherList?
+      requestSettings.agentOptions =
+        ciphers: cipherList
+
     request.createReadStream requestSettings, (readStream) =>
       readStream.on 'error', (error) ->
         callback("Unable to download #{packageUrl}: #{error.message}")
